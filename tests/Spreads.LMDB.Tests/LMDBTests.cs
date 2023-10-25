@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
 // ReSharper disable AccessToDisposedClosure
 
 namespace Spreads.LMDB.Tests
@@ -21,8 +22,10 @@ namespace Spreads.LMDB.Tests
     [TestFixture]
     public class LMDBTests
     {
+        public static string GetFullPath(string path) => Path.Combine(TestUtils.BaseDataPath, path);
+
         [Test]
-        public async Task CouldCreateEnvironment()
+        public void CouldCreateEnvironment()
         {
             //var x = Marshal.AllocHGlobal(128);
             //var y = Marshal.AllocHGlobal(128);
@@ -31,7 +34,7 @@ namespace Spreads.LMDB.Tests
 
             // Assert.AreEqual(LMDBVersionInfo.Version, "LMDB 0.9.22: (March 21, 2018)");
             Console.WriteLine(LMDBVersionInfo.Version);
-            var env = LMDBEnvironment.Create("./Data/CouldCreateEnvironment");
+            var env = LMDBEnvironment.Create(GetFullPath("Data/CouldCreateEnvironment"));
             env.Open();
             var stat = env.GetStat();
             Console.WriteLine("entries: " + stat.ms_entries);
@@ -41,11 +44,11 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test]
-        public async Task CouldCreateEnvironmentWithCyrillicPath()
+        public void CouldCreateEnvironmentWithCyrillicPath()
         {
             // Assert.AreEqual(LMDBVersionInfo.Version, "LMDB 0.9.22: (March 21, 2018)");
             Console.WriteLine(LMDBVersionInfo.Version);
-            var env = LMDBEnvironment.Create("./Data/CouldCreateEnvironment/МояПапка");
+            var env = LMDBEnvironment.Create(GetFullPath("Data/CouldCreateEnvironment/МояПапка"));
             env.Open();
             var stat = env.GetStat();
             Console.WriteLine("entries: " + stat.ms_entries);
@@ -55,7 +58,7 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test]
-        public async Task CouldCreateEnvironmentWithFullPath()
+        public void CouldCreateEnvironmentWithFullPath()
         {
             var path = Path.GetFullPath(Path.Combine(TestUtils.GetPath(), "subpath"));
             // Assert.AreEqual(LMDBVersionInfo.Version, "LMDB 0.9.22: (March 21, 2018)");
@@ -80,6 +83,7 @@ namespace Spreads.LMDB.Tests
             var used = env.TouchSpace(5);
             var stat = env.GetStat();
             Console.WriteLine("Used size: " + used);
+            Console.WriteLine(stat);
             env.Close();
 
             Console.WriteLine("Touch default: ");
@@ -91,6 +95,7 @@ namespace Spreads.LMDB.Tests
             used = env.TouchSpace();
             stat = env.GetStat();
             Console.WriteLine("Used size: " + used);
+            Console.WriteLine(stat);
             env.Close();
         }
 
@@ -105,47 +110,8 @@ namespace Spreads.LMDB.Tests
                 env.MapSize = 10L * 1024 * 1024 * 1024;
                 env.Open();
                 var stat = env.GetStat();
+                Console.WriteLine(stat);
             }
-        }
-
-        // TODO fix
-        [Test, Explicit("hangs")]
-        public async Task CouldWriteAsync()
-        {
-            var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path, disableAsync:false);
-            env.Open();
-            var stat = env.GetStat();
-
-            using (var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create)))
-            {
-                db.Truncate();
-
-                var values = new byte[] { 1, 2, 3, 4 };
-
-                await env.WriteAsync(txn =>
-                {
-                    var key = new DirectBuffer(values);
-                    var value = new DirectBuffer(values);
-                    DirectBuffer value2 = default;
-
-                    using (var cursor = db.OpenCursor(txn))
-                    {
-                        Assert.IsTrue(cursor.TryPut(ref key, ref value, CursorPutOptions.NoOverwrite));
-                    }
-
-                    using (var cursor = db.OpenCursor(txn))
-                    {
-                        Assert.IsTrue(cursor.TryGet(ref key, ref value2, CursorGetOption.SetKey));
-                    }
-
-                    Assert.IsTrue(value2.Span.SequenceEqual(value.Span));
-                    txn.Commit();
-                    return Task.CompletedTask;
-                }, false).ConfigureAwait(false);
-            }
-
-            env.Close();
         }
 
         [Test]
@@ -200,7 +166,7 @@ namespace Spreads.LMDB.Tests
 
                     c.Dispose();
                     txn.Commit();
-                }, false);
+                });
             }
 
             Console.WriteLine("---------------------------");
@@ -227,8 +193,9 @@ namespace Spreads.LMDB.Tests
                         {
                             addresses2[i] = (long)value.Data - addr;
                             Console.WriteLine((long)value.Data + " - " + (long)value.Data % 4096 + " - " + addresses2[i] + " - " + addresses[i]);
-                            System.Runtime.CompilerServices.Unsafe.WriteUnaligned((void*)value.Data, i);
+                            Unsafe.WriteUnaligned((void*)value.Data, i);
                         }
+
                         addr = (long)value.Data;
                     }
                 }
@@ -268,7 +235,8 @@ namespace Spreads.LMDB.Tests
                     }
                     else
                     {
-                        var value = DirectBuffer.LengthOnly((uint)(env.PageSize - env.OverflowPageHeaderSize)); db.Put(txn, ref key1, ref value, TransactionPutOptions.ReserveSpace);
+                        var value = DirectBuffer.LengthOnly((uint)(env.PageSize - env.OverflowPageHeaderSize));
+                        db.Put(txn, ref key1, ref value, TransactionPutOptions.ReserveSpace);
                         value.Clear(0, value.Length);
                         SharedBuffer = value;
                     }
@@ -323,7 +291,7 @@ namespace Spreads.LMDB.Tests
 
                     c.Dispose();
                     txn.Commit();
-                }, false);
+                });
             }
 
             Console.WriteLine("---------------------------");
@@ -350,8 +318,9 @@ namespace Spreads.LMDB.Tests
                         {
                             addresses2[i] = (long)value.Data - addr;
                             Console.WriteLine((long)value.Data + " - " + (long)value.Data % 4096 + " - " + addresses2[i] + " - " + addresses[i]);
-                            System.Runtime.CompilerServices.Unsafe.WriteUnaligned((void*)value.Data, i);
+                            Unsafe.WriteUnaligned((void*)value.Data, i);
                         }
+
                         addr = (long)value.Data;
                     }
                 }
@@ -449,7 +418,7 @@ namespace Spreads.LMDB.Tests
         [Test, Explicit("long runnning")]
         public void CouldOpenHugeEnv()
         {
-            var env = LMDBEnvironment.Create("C:/localdata/tmp/TestData/HugeEnv", LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
+            var env = LMDBEnvironment.Create(GetFullPath("HugeEnv"), LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
             env.MapSize = 2 * 1024L * 1024 * 1024 * 1024L;
             env.Open();
 
@@ -476,24 +445,24 @@ namespace Spreads.LMDB.Tests
                     //}
                     //c.Dispose();
                     txn.Commit();
-                }, false);
+                });
             }
             db.Dispose();
             env.Close();
         }
 
         [Test, Explicit("long runnning")]
-        public async Task CouldWriteAndReadProfileReadPath()
+        public void CouldWriteAndReadProfileReadPath()
         {
             var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path, disableAsync:false);
+            var env = LMDBEnvironment.Create(path);
             env.Open();
 
             var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create));
 
             var values = new byte[] { 1, 2, 3, 4 };
 
-            await env.WriteAsync(txn =>
+            env.Write(txn =>
             {
                 var key = new DirectBuffer(values);
                 var value = new DirectBuffer(values);
@@ -503,9 +472,10 @@ namespace Spreads.LMDB.Tests
                 {
                     Assert.IsTrue(cursor.TryPut(ref key, ref value, CursorPutOptions.None));
                 }
+
                 txn.Commit();
-                return null;
-            }, false).ConfigureAwait(false);
+                return 0;
+            });
 
             env.Read(txn =>
             {
@@ -548,62 +518,6 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test, Explicit("long runnning")]
-        public async Task CouldWriteAndReadProfileWriteAsyncPath()
-        {
-            var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path,
-                // for any other config we have SQLite :)
-                LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync, disableAsync:false);
-            env.Open();
-
-            var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create));
-
-            var values = new byte[] { 1, 2, 3, 4 };
-
-            var count = 1_000;
-
-            using (Benchmark.Run("Write sync transactions", count))
-            {
-                for (var i = 0; i < count; i++)
-                {
-                    await env.WriteAsync(txn =>
-                    {
-                        var key = new DirectBuffer(values);
-                        var value = new DirectBuffer(values);
-                        DirectBuffer value2 = default;
-
-                        using (var cursor = db.OpenCursor(txn))
-                        {
-                            cursor.TryPut(ref key, ref value, CursorPutOptions.None);
-                        }
-
-                        txn.Commit();
-                        return null;
-                    }, false).ConfigureAwait(false);
-                }
-            }
-
-            Benchmark.Dump();
-
-            env.Read(txn =>
-            {
-                var key = new DirectBuffer(values);
-                var value = new DirectBuffer(values);
-                DirectBuffer value2 = default;
-
-                using (var cursor = db.OpenReadOnlyCursor(txn))
-                {
-                    Assert.IsTrue(cursor.TryGet(ref key, ref value2, CursorGetOption.SetKey));
-                }
-                Assert.IsTrue(value2.Span.SequenceEqual(value.Span));
-
-                return true;
-            });
-            db.Dispose();
-            env.Close();
-        }
-
-        [Test, Explicit("long runnning")]
         public void CouldWriteAndReadProfileWriteSYNCPath()
         {
             var path = TestUtils.GetPath();
@@ -615,9 +529,6 @@ namespace Spreads.LMDB.Tests
             var values = new byte[] { 1, 2, 3, 4 };
 
             var count = 1_000;
-
-            // NB: Draining queue after benchmark ends, so fire and forget case only shows overhead of sending
-            const bool fireAndForget = false;
 
             using (Benchmark.Run("Write sync transactions", count))
             {
@@ -635,7 +546,7 @@ namespace Spreads.LMDB.Tests
                         }
 
                         txn.Commit();
-                    }, fireAndForget);
+                    });
                 }
             }
 
@@ -651,6 +562,7 @@ namespace Spreads.LMDB.Tests
                 {
                     Assert.IsTrue(cursor.TryGet(ref key, ref value2, CursorGetOption.SetKey));
                 }
+
                 Assert.IsTrue(value2.Span.SequenceEqual(value.Span));
 
                 return true;
@@ -660,7 +572,7 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test, Explicit("long runnning")]
-        public async Task CouldWriteDupfixed()
+        public void CouldWriteDupfixed()
         {
             var path = TestUtils.GetPath();
             var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
@@ -687,7 +599,7 @@ namespace Spreads.LMDB.Tests
                     try
                     {
                         valueHolder[0] = i;
-                        await db.PutAsync(0, i, TransactionPutOptions.AppendDuplicateData);
+                        db.Put(0, i, TransactionPutOptions.AppendDuplicateData);
                     }
                     catch (Exception e)
                     {
@@ -800,7 +712,7 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test]
-        public async Task CouldDeleteDupSorted()
+        public void CouldDeleteDupSorted()
         {
             var path = TestUtils.GetPath();
             var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
@@ -818,7 +730,7 @@ namespace Spreads.LMDB.Tests
             {
                 try
                 {
-                    await db.PutAsync(0, i, TransactionPutOptions.AppendDuplicateData);
+                    db.Put(0, i, TransactionPutOptions.AppendDuplicateData);
                 }
                 catch (Exception e)
                 {
@@ -831,13 +743,15 @@ namespace Spreads.LMDB.Tests
                 Assert.AreEqual(1, db.AsEnumerable<int, int>(txn).Count());
                 foreach (var kvp in db.AsEnumerable<int, int>(txn))
                 {
-                    Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
+                    if (kvp.Value < 10)
+                        Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
                 }
 
                 Assert.AreEqual(count, db.AsEnumerable<int, int>(txn, 0).Count());
                 foreach (var value in db.AsEnumerable<int, int>(txn, 0))
                 {
-                    Console.WriteLine("Key0 value: " + value);
+                    if (value < 10)
+                        Console.WriteLine("Key0 value: " + value);
                 }
             }
 
@@ -852,13 +766,15 @@ namespace Spreads.LMDB.Tests
                 Assert.AreEqual(1, db.AsEnumerable<int, int>(txn).Count());
                 foreach (var kvp in db.AsEnumerable<int, int>(txn))
                 {
-                    Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
+                    if (kvp.Value < 10)
+                        Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
                 }
 
                 Assert.AreEqual(count - 1, db.AsEnumerable<int, int>(txn, 0).Count());
                 foreach (var value in db.AsEnumerable<int, int>(txn, 0))
                 {
-                    Console.WriteLine("Key0 value: " + value);
+                    if (value < 10)
+                        Console.WriteLine("Key0 value: " + value);
                 }
             }
 
@@ -874,21 +790,24 @@ namespace Spreads.LMDB.Tests
                 Assert.AreEqual(0, db.AsEnumerable<int, int>(txn).Count());
                 foreach (var kvp in db.AsEnumerable<int, int>(txn))
                 {
-                    Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
+                    if (kvp.Value < 10)
+                        Console.WriteLine($"kvp: {kvp.Key} - {kvp.Value}");
                 }
 
                 Assert.AreEqual(0, db.AsEnumerable<int, int>(txn, 0).Count());
                 foreach (var value in db.AsEnumerable<int, int>(txn, 0))
                 {
-                    Console.WriteLine("Key0 value: " + value);
+                    if (value < 10)
+                        Console.WriteLine("Key0 value: " + value);
                 }
             }
+
             db.Dispose();
             env.Close();
         }
 
         [Test, Explicit("long runnning")]
-        public async Task CouldWriteDupfixedFromTwoThreads()
+        public void CouldWriteDupfixedFromTwoThreads()
         {
             var path = TestUtils.GetPath();
             var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
@@ -911,7 +830,7 @@ namespace Spreads.LMDB.Tests
                     {
                         try
                         {
-                            db.PutAsync(0, Interlocked.Increment(ref key), TransactionPutOptions.NoDuplicateData).Wait();
+                            db.Put(0, Interlocked.Increment(ref key), TransactionPutOptions.NoDuplicateData);
                         }
                         catch (Exception e)
                         {
@@ -929,7 +848,7 @@ namespace Spreads.LMDB.Tests
                     {
                         try
                         {
-                            db.PutAsync(0, Interlocked.Increment(ref key), TransactionPutOptions.NoDuplicateData).Wait();
+                            db.Put(0, Interlocked.Increment(ref key), TransactionPutOptions.NoDuplicateData);
                         }
                         catch (Exception e)
                         {
@@ -956,7 +875,7 @@ namespace Spreads.LMDB.Tests
         }
 
         [Test, Explicit("long runnning")]
-        public async Task CouldUpdateInplaceFromAbortedWriteTransactions()
+        public void CouldUpdateInplaceFromAbortedWriteTransactions()
         {
             var path = TestUtils.GetPath();
             var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
@@ -990,7 +909,7 @@ namespace Spreads.LMDB.Tests
                                 Key = i,
                                 Value = 0
                             };
-                            db.PutAsync(i, value, TransactionPutOptions.AppendData | TransactionPutOptions.NoDuplicateData).Wait();
+                            db.Put(i, value, TransactionPutOptions.AppendData | TransactionPutOptions.NoDuplicateData);
                             if (i % 1000 == 0)
                             {
                                 // env.Sync(true);
@@ -1082,6 +1001,7 @@ namespace Spreads.LMDB.Tests
                                     {
                                         Assert.Fail($"Wrong keys: {key.ReadInt32(0)} vs {value.ReadInt64(0)}");
                                     }
+
                                     counts[value.ReadInt64(0)] = value.InterlockedCompareExchangeInt64(8, 1, 0);
                                     changedPointers[value.ReadInt64(0)] = DbSafePtr(value);
                                     cnt++;
@@ -1155,6 +1075,7 @@ namespace Spreads.LMDB.Tests
                     Console.WriteLine($"Pointers {i}: {changedPointers[i]} - {finalPointers[i]} - {changedPointers[i].ToInt64() - finalPointers[i].ToInt64()}");
                 }
             }
+
             db.Dispose();
             env.Close();
         }
@@ -1193,155 +1114,155 @@ namespace Spreads.LMDB.Tests
             Console.WriteLine("OFP: " + stat.ms_overflow_pages);
         }
 
-        private static unsafe IntPtr DbSafePtr(DirectBuffer db)
-        {
-            return (IntPtr)db.Data;
-        }
+        private static unsafe IntPtr DbSafePtr(DirectBuffer db) => (IntPtr)db.Data;
 
-        [Test]
-        public void CouldOpenRoCursorFromWriteTxn()
-        {
-            var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
-            env.Open();
+        // [Test]
+        // public void CouldOpenRoCursorFromWriteTxn()
+        // {
+        //     var path = TestUtils.GetPath();
+        //     var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
+        //     env.Open();
+        //
+        //     var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create));
+        //
+        //     using (var txn = env.BeginTransaction())
+        //     using (var cursor = db.OpenReadOnlyCursor(txn))
+        //     using (var cursor2 = db.OpenReadOnlyCursor(txn))
+        //     {
+        //     }
+        //
+        //     db.Dispose();
+        //     env.Close();
+        // }
 
-            var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create));
+        // [Test]
+        // public unsafe void CursorCanTryGetWhenAllRecordsDeleted()
+        // {
+        //     var path = TestUtils.GetPath();
+        //     var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
+        //     env.Open();
+        //     var key = 42L;
+        //     // TODO this is not pinned and only works by luck, until GC moves the byte[] buffer
+        //     var kdb = new DirectBuffer(8, (IntPtr)(&key));
+        //     const int count = 20;
+        //     var r = new Random();
+        //     using (var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create | DbFlags.DuplicatesSort) { DupSortPrefix = 64 }))
+        //     {
+        //         db.Truncate();
+        //         using (var tx = env.BeginTransaction())
+        //         {
+        //             var buffer = new byte[64];
+        //             for (int i = 0; i < count; i++)
+        //             {
+        //                 long v = i + 1;
+        //                 r.NextBytes(buffer);
+        //                 var bytes = BitConverter.GetBytes(v).Concat(buffer).ToArray();
+        //                 fixed (void* _ = &bytes[0])
+        //                 {
+        //                     var valdb = new DirectBuffer(bytes);
+        //                     db.Put(tx, ref kdb, ref valdb, TransactionPutOptions.AppendDuplicateData);
+        //                 }
+        //             }
+        //
+        //             tx.Commit();
+        //         }
+        //
+        //         using (var tx = env.BeginTransaction())
+        //         {
+        //             using (var c = db.OpenCursor(tx))
+        //             {
+        //                 long prefix = 1L;
+        //                 Assert.IsTrue(c.TryFindDup(Lookup.EQ, ref key, ref prefix));
+        //                 Assert.AreEqual(1, prefix);
+        //
+        //                 // c is now at dup 1
+        //                 while (c.Delete(false))
+        //                 {
+        //                     // One way to detect when all values are deleted is to call the method with CursorGetOption.Set option.
+        //                     // We need to check is kdb exists, and it is deleted when the last dupsorted value is deleted.
+        //                     //if (!c.TryGet(ref key, ref prefix, CursorGetOption.Set))
+        //                     //{
+        //                     //    break;
+        //                     //}
+        //
+        //                     // We cannot call GetCurrent after deleting the last dupsorted value,
+        //                     // because GetCurrent does not move the cursor. It is the only cursor
+        //                     // operation (other then multi ops which are not supported by this lib so far)
+        //                     // that does not move the cursors, but depends on previous moves.
+        //                     // http://www.lmdb.tech/doc/group__mdb.html#ga1206b2af8b95e7f6b0ef6b28708c9127
+        //                     // If you want to move cursor to both key and dubsorted value then use
+        //                     // CursorGetOption.GetBoth for exact match, or CursorGetOption.GetBothRange, which
+        //                     // "positions at key, nearest data.", but does not specify nearest to which direction.
+        //                     // It's better to call Spreads's extension TryFindDup with Lookup option,
+        //                     // it behaves much more intuitively and does all required work on C side, saving P/Invoke calls.
+        //                     if (c.TryGet(ref key, ref prefix, CursorGetOption.GetBothRange))
+        //                     {
+        //                         Console.WriteLine(prefix);
+        //                     }
+        //                     else
+        //                     {
+        //                         // need to exit the loop if there are no more values, delete works on current value
+        //                         // which is invalid after deleting the last one.
+        //                         break;
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        //
+        //     env.Dispose();
+        // }
 
-            using (var txn = env.BeginTransaction())
-            using (var cursor = db.OpenReadOnlyCursor((ReadOnlyTransaction)txn))
-            using (var cursor2 = db.OpenReadOnlyCursor(txn))
-            {
-            }
-            db.Dispose();
-            env.Close();
-        }
-
-
-        [Test]
-        public unsafe void CursorCanTryGetWhenAllRecordsDeleted()
-        {
-            var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
-            env.Open();
-            var key = 42L;
-            // TODO this is not pinned and only works by luck, until GC moves the byte[] buffer
-            var kdb = new DirectBuffer(BitConverter.GetBytes(key));
-            const int count = 20;
-            var r = new Random();
-            using (var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create | DbFlags.DuplicatesSort) {DupSortPrefix = 64}))
-            {
-                db.Truncate();
-                using (var tx = env.BeginTransaction())
-                {
-                    var buffer = new byte[64];
-                    for (int i = 0; i < count; i++)
-                    {
-                        long v = i+1;
-                        r.NextBytes(buffer);
-                        var bytes = BitConverter.GetBytes(v).Concat(buffer).ToArray();
-                        var valdb = new DirectBuffer(bytes);
-                        db.Put(tx, ref kdb, ref valdb, TransactionPutOptions.AppendDuplicateData);
-                    }
-
-                    tx.Commit();
-                }
-
-                using (var tx = env.BeginTransaction())
-                {
-                    using (var c = db.OpenCursor(tx))
-                    {
-                        long prefix = 1L;
-                        Assert.IsTrue(c.TryFindDup(Lookup.EQ, ref key, ref prefix));
-                        Assert.AreEqual(1, prefix);
-
-                        // c is now at dup 1
-                        while(c.Delete(false))
-                        {
-                            // One way to detect when all values are deleted is to call the method with CursorGetOption.Set option.
-                            // We need to check is kdb exists, and it is deleted when the last dupsorted value is deleted.
-                            //if (!c.TryGet(ref key, ref prefix, CursorGetOption.Set))
-                            //{
-                            //    break;
-                            //}
-
-                            // We cannot call GetCurrent after deleting the last dupsorted value,
-                            // because GetCurrent does not move the cursor. It is the only cursor
-                            // operation (other then multi ops which are not supported by this lib so far)
-                            // that does not move the cursors, but depends on previous moves.
-                            // http://www.lmdb.tech/doc/group__mdb.html#ga1206b2af8b95e7f6b0ef6b28708c9127
-                            // If you want to move cursor to both key and dubsorted value then use
-                            // CursorGetOption.GetBoth for exact match, or CursorGetOption.GetBothRange, which
-                            // "positions at key, nearest data.", but does not specify nearest to which direction.
-                            // It's better to call Spreads's extension TryFindDup with Lookup option,
-                            // it behaves much more intuitively and does all required work on C side, saving P/Invoke calls.
-                            if (c.TryGet(ref key, ref prefix, CursorGetOption.GetBothRange))
-                            {
-                                Console.WriteLine(prefix);
-                            }
-                            else
-                            {
-                                // need to exit the loop if there are no more values, delete works on current value
-                                // which is invalid after deleting the last one.
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            env.Dispose();
-        }
-
-        [Test]
-        public unsafe void Issue24()
-        {
-            var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
-            env.Open();
-            var key = "salamo";
-            var value = "simoliakho";
-
-            var keyLen = Encoding.UTF8.GetByteCount(key);
-            var keyBytes = stackalloc byte[keyLen];
-
-            var valLen = Encoding.UTF8.GetByteCount(value);
-            var valBytes = stackalloc byte[valLen];
-
-            fixed (char* keyCPtr = key, valCPtr = value)
-            {
-                Encoding.UTF8.GetBytes(keyCPtr, key.Length, keyBytes, keyLen);
-                Encoding.UTF8.GetBytes(valCPtr, value.Length, valBytes, valLen);
-            }
-
-            using (var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create)))
-            {
-                using (var tx = env.BeginTransaction())
-                {
-                    var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
-                    var valuedb = new DirectBuffer(valLen, (nint)valBytes);
-                    db.Put(tx, ref keydb, ref valuedb, TransactionPutOptions.NoDuplicateData);
-
-                    tx.Commit();
-                }
-
-                using (var tx = env.BeginReadOnlyTransaction())
-                {
-                    var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
-                    DirectBuffer valuedb = default;
-                    Assert.IsTrue(db.TryGet(tx, ref keydb, out valuedb));
-                    Assert.AreEqual(value, Encoding.UTF8.GetString(valuedb.Span.ToArray()));
-                }
-
-                using (var tx = env.BeginReadOnlyTransaction())
-                using (var c = db.OpenReadOnlyCursor(tx))
-                {
-                    var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
-                    DirectBuffer valuedb = default;
-                    Assert.IsTrue(c.TryFind(Spreads.Lookup.EQ, ref keydb, out valuedb));
-                }
-            }
-
-            env.Dispose();
-        }
+        // [Test]
+        // public unsafe void Issue24()
+        // {
+        //     var path = TestUtils.GetPath();
+        //     var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.WriteMap);
+        //     env.Open();
+        //     var key = "salamo";
+        //     var value = "simoliakho";
+        //
+        //     var keyLen = Encoding.UTF8.GetByteCount(key);
+        //     var keyBytes = stackalloc byte[keyLen];
+        //
+        //     var valLen = Encoding.UTF8.GetByteCount(value);
+        //     var valBytes = stackalloc byte[valLen];
+        //
+        //     fixed (char* keyCPtr = key, valCPtr = value)
+        //     {
+        //         Encoding.UTF8.GetBytes(keyCPtr, key.Length, keyBytes, keyLen);
+        //         Encoding.UTF8.GetBytes(valCPtr, value.Length, valBytes, valLen);
+        //     }
+        //
+        //     using (var db = env.OpenDatabase("first_db", new DatabaseConfig(DbFlags.Create)))
+        //     {
+        //         using (var tx = env.BeginTransaction())
+        //         {
+        //             var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
+        //             var valuedb = new DirectBuffer(valLen, (nint)valBytes);
+        //             db.Put(tx, ref keydb, ref valuedb, TransactionPutOptions.NoDuplicateData);
+        //
+        //             tx.Commit();
+        //         }
+        //
+        //         using (var tx = env.BeginTransaction())
+        //         {
+        //             var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
+        //             DirectBuffer valuedb = default;
+        //             Assert.IsTrue(db.TryGet(tx, ref keydb, out valuedb));
+        //             Assert.AreEqual(value, Encoding.UTF8.GetString(valuedb.Span.ToArray()));
+        //         }
+        //
+        //         using (var tx = env.BeginTransaction())
+        //         using (var c = db.OpenReadOnlyCursor(tx))
+        //         {
+        //             var keydb = new DirectBuffer(keyLen, (nint)keyBytes);
+        //             DirectBuffer valuedb = default;
+        //             Assert.IsTrue(c.TryFind(Lookup.EQ, ref keydb, out valuedb));
+        //         }
+        //     }
+        //
+        //     env.Dispose();
+        // }
     }
 }

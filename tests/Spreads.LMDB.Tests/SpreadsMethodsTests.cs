@@ -16,7 +16,7 @@ namespace Spreads.LMDB.Tests
         [Test]
         public void CouldFindNoDup()
         {
-            var env = LMDBEnvironment.Create("./Data/CouldFindNoDup",
+            var env = LMDBEnvironment.Create(TestUtils.GetPath(),
                 LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
             env.Open();
 
@@ -884,8 +884,7 @@ namespace Spreads.LMDB.Tests
         public void CouldFindDupWideKey()
         {
             var path = TestUtils.GetPath();
-            var env = LMDBEnvironment.Create(path,
-                 LMDBEnvironmentFlags.NoSync, disableAsync: true);
+            var env = LMDBEnvironment.Create(path, LMDBEnvironmentFlags.NoSync);
             env.MapSize = 100 * 1024 * 1024;
             env.Open();
 
@@ -1166,7 +1165,7 @@ namespace Spreads.LMDB.Tests
         [Test]
         public void CouldFindDupDSIssue()
         {
-            var env = LMDBEnvironment.Create("./Data/CouldFindDup",
+            var env = LMDBEnvironment.Create(TestUtils.GetPath(),
                 LMDBEnvironmentFlags.WriteMap | LMDBEnvironmentFlags.NoSync);
             env.Open();
 
