@@ -217,10 +217,10 @@ namespace Spreads.LMDB.Tests
 
             env.Open();
 
-            var db = env.OpenDatabase("db_reserve", new DatabaseConfig(DbFlags.Create | DbFlags.IntegerKey));
+            var db = env.OpenDatabase("db_reserve2", new DatabaseConfig(DbFlags.Create | DbFlags.IntegerKey));
 
             DirectBuffer SharedBuffer;
-            var _ = env.PageSize - env.OverflowPageHeaderSize;
+            var _ = env.PageSize - env.OverflowPageHeaderSize; 
             using (var txn = env.BeginTransaction())
             {
                 try
@@ -329,6 +329,7 @@ namespace Spreads.LMDB.Tests
             var stat = env.GetStat();
             var dbstat = db.GetStat();
             Console.WriteLine("Oveflow pages: " + stat.ms_overflow_pages);
+            Console.WriteLine(dbstat);
             db.Dispose();
             env.Close();
         }
@@ -1112,6 +1113,10 @@ namespace Spreads.LMDB.Tests
             var stat = env.GetStat();
             var info = env.GetEnvInfo();
             Console.WriteLine("OFP: " + stat.ms_overflow_pages);
+            var db = env.OpenDatabase("test", new DatabaseConfig(DbFlags.Create));
+            db.Dispose();
+            env.Close();
+            env.Dispose();
         }
 
         private static unsafe IntPtr DbSafePtr(DirectBuffer db) => (IntPtr)db.Data;
